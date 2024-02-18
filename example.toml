@@ -1,0 +1,8 @@
+[server]
+addr = "cse.unsw.edu.au"
+port = 22
+user = "z5555555" # Change this.
+
+[auth]
+type = "password"
+password = "changeme" # Optional. Recommended to change for a nicer flow. 

@@ -1,9 +1,12 @@
 # TODO 
 
 [] Establish a connection to cse servers 
-[] Create config files for 
+[] Create config files based on `example.toml` 
     [] Server address and port 
     [] zID and password 
+    [] This needs to be initialised in `$HOME/.config/csecmd/config.toml` and prompt
+       the user to change the necessary fields.
+[] Parse command line arguments for `command`
 [] SFTP - upload required files for `6991 autotest` and `6991 give-crate` to work.
     [] Add ability to ignore `target` folder and `.git` folders.
 [] Change directory to container directory w/ files and execute command.
