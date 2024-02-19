@@ -4,5 +4,5 @@ port = 22
 user = "z5555555" # Change this.
 
 [auth]
-type = "password"
+auth_type = "password"
 password = "changeme" # Optional. Recommended to change for a nicer flow. 
