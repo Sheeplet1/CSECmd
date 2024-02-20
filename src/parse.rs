@@ -40,7 +40,7 @@ fn default_config_contents() -> &'static str {
 }
 
 pub fn get_config_path() -> Result<PathBuf, Box<dyn Error>> {
-    // check if config.toml exists at $HOME/.config/csecmd/
+    // Check if config.toml exists at $HOME/.config/csecmd/
     let home_dir = home_dir().expect("All systems have a home directory");
     let mut conf_path = PathBuf::new();
     conf_path.push(home_dir);

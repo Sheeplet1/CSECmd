@@ -1,10 +1,10 @@
 # TODO
 
 - [x] Establish a connection to cse servers
-- [] Create config files based on `example.toml`
-  - [] Server address and port
-  - [] zID and password
-    - [] This needs to be initialised in `$HOME/.config/csecmd/config.toml` and prompt
+- [x] Create config files based on `example.toml`
+  - [x] Server address and port
+  - [x] zID and password
+    - [x] This needs to be initialised in `$HOME/.config/csecmd/config.toml` and prompt
       the user to change the necessary fields.
       - Which means we need a comparison between example.toml and config.toml
         to confirm that the fields have been changed.
