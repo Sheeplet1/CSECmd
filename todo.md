@@ -5,12 +5,12 @@
   - [x] Server address and port
   - [x] zID and password
     - [x] This needs to be initialised in `$HOME/.config/csecmd/config.toml` and prompt
-      the user to change the necessary fields.
-      - Which means we need a comparison between example.toml and config.toml
-        to confirm that the fields have been changed.
-- [] Parse command line arguments for `command`
+          the user to change the necessary fields.
+- [x] Parse command line arguments for `command`
 - [] SFTP - upload required files for `6991 autotest` and `6991 give-crate` to work.
-- [] Add ability to ignore `target` folder and `.git` folders.
+  - [] SFTP mkdir function
+  - [] SFTP recursively upload files and/or directories.
+  - [] Add ability to ignore `target` folder and `.git` folders.
 - [] Change directory to container directory w/ files and execute command.
 - [] Receive output and display onto local machine.
 
