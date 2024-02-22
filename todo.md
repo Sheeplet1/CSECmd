@@ -7,10 +7,9 @@
     - [x] This needs to be initialised in `$HOME/.config/csecmd/config.toml` and prompt
           the user to change the necessary fields.
 - [x] Parse command line arguments for `command`
-- [] SFTP - upload required files for `6991 autotest` and `6991 give-crate` to work.
-  - [] SFTP mkdir function
-  - [] SFTP recursively upload files and/or directories.
-  - [] Add ability to ignore `target` folder and `.git` folders.
+- [x] SFTP - upload required files for `6991 autotest` and `6991 give-crate` to work.
+  - [x] SFTP mkdir function
+  - [x] SFTP recursively upload files and/or directories.
 - [] Change directory to container directory w/ files and execute command.
 - [] Receive output and display onto local machine.
 

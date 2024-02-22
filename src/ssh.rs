@@ -23,6 +23,8 @@ pub struct Config {
     pub command: String,
 }
 
+/// Connect to CSE UNSW's servers, upload the local directory and execute
+/// the given command. Returns the standard output from the command.
 pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     let tcp = TcpStream::connect(config.server_addr)?;
     println!("Connecting to CSE UNSW...");
@@ -38,20 +40,18 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
 
     println!("Authentication as {}", config.username);
 
-    // TODO: Recursively upload files and directory to CSE to autotest/give-crate on
-    // Files required for 6991: src, Cargo.toml, Cargo.lock
-    // Sandbox container located at $HOME/.csecmd/<directory_name>_<command>_<time_stamp>
     let sftp = sess.sftp()?;
 
     // using current time-stamp as file name - realistically, this name doesn't
-    // matter as we will be cleaning it up after we've completed our command
+    // matter as we will be cleaning it up after we've completed our command so
+    // as to reduce space consumption and congestion.
     let temp_dir_name = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S").to_string();
     let remote_dir = format!(".csecmd_dump/temp/{}", temp_dir_name);
     let remote_dir_path = Path::new(&remote_dir);
 
     sftp_mkdir_recur(&sftp, remote_dir_path)?;
 
-    // Set up sandbox directory which will contain the files uploaded
+    // Set up sandbox directory which will contain the uploaded files.
     let sandbox_path = remote_dir_path.join("sandbox");
     sftp.mkdir(sandbox_path.as_path(), 0o755)?;
 
@@ -59,20 +59,28 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     upload_dir(&sftp, Path::new(local_dir), &sandbox_path)?;
     println!("Synced local files to remote...");
 
-    // TODO: Add a clean-up part which deletes the sandbox files, otherwise
-    // this will eventually cap out and/or clutter the storage allocation.
-
     // NOTE: Executing command stuff
-    //
-    // let mut channel = sess.channel_session()?;
-    // channel.exec("ls")?;
-    //
+    let mut channel = sess.channel_session()?;
+    channel.exec(format!("cd ~/{}", remote_dir).as_str())?;
+
+    let mut command_file = sftp.create(&remote_dir_path.join("command.txt"))?;
+    command_file.write_all(config.command.as_bytes())?;
+
+    // TODO: Execute given command on the uploaded directory.
+
+    // TODO: Read output into a buffer and print to this local machine's standard
+    // output.
+
     // let mut output = String::new();
     // channel.read_to_string(&mut output)?;
     // println!("===== Output =====");
     // println!("{:#?}", output);
     //
     // let _ = channel.wait_close();
+
+    // TODO: Add a clean-up part which deletes the sandbox files, otherwise
+    // this will eventually cap out and/or clutter the storage allocation.
+
     println!("Disconnected from CSE UNSW...");
 
     Ok(())
@@ -100,6 +108,7 @@ fn sftp_mkdir_recur(sftp: &Sftp, path: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Uploads a file located at the `local_path` to the remote server at the `remote_path`.
 fn upload_file(sftp: &Sftp, local_path: &Path, remote_path: &Path) -> Result<(), Box<dyn Error>> {
     let mut file = File::open(local_path)?;
     let mut metadata = Vec::new();
@@ -121,10 +130,6 @@ pub fn upload_dir(
     // TODO: Add styling here - spinner/progress bar for user
 
     for res in Walk::new("./") {
-        // TODO: Upload file to relative path on cse server.
-        // Which means we need to construct the relative path and then
-        // check that the directory exists on the server
-
         match res {
             Ok(entry) => {
                 let path = entry.path();
@@ -135,7 +140,12 @@ pub fn upload_dir(
                     if path.is_dir() {
                         match sftp.mkdir(&remote_path, 0o755) {
                             Ok(_) => (),
-                            Err(err) => eprintln!("Directory creation error: {:?}", err),
+                            Err(err) => eprintln!(
+                                // BUG: /sandbox/ creation error
+                                //  SFTP(4) : Failure
+                                "Directory creation error at {:?}\n{:?}",
+                                remote_path, err
+                            ),
                         }
                     } else {
                         upload_file(sftp, path, &remote_path)?;
@@ -149,6 +159,6 @@ pub fn upload_dir(
     Ok(())
 }
 
-fn clean_up_dir() -> Result<(), Box<dyn Error>> {
+fn clean_up() -> Result<(), Box<dyn Error>> {
     todo!()
 }
