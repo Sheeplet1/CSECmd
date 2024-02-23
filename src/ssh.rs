@@ -52,10 +52,10 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     sftp_mkdir_recur(&sftp, remote_dir_path)?;
 
     // Set up sandbox directory which will contain the uploaded files.
-    let sandbox_path = remote_dir_path.join("sandbox");
-    sftp.mkdir(sandbox_path.as_path(), 0o755)?;
+    // sftp.mkdir(sandbox_path.as_path(), 0o755)?;
 
     let local_dir = "./";
+    let sandbox_path = remote_dir_path.join("sandbox");
     upload_dir(&sftp, Path::new(local_dir), &sandbox_path)?;
     println!("Synced local files to remote...");
 
@@ -67,6 +67,8 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     command_file.write_all(config.command.as_bytes())?;
 
     // TODO: Execute given command on the uploaded directory.
+    channel.exec(format!("cd ~/{}/sandbox", remote_dir).as_str())?;
+    channel.exec(&config.command)?;
 
     // TODO: Read output into a buffer and print to this local machine's standard
     // output.
@@ -141,8 +143,6 @@ pub fn upload_dir(
                         match sftp.mkdir(&remote_path, 0o755) {
                             Ok(_) => (),
                             Err(err) => eprintln!(
-                                // BUG: /sandbox/ creation error
-                                //  SFTP(4) : Failure
                                 "Directory creation error at {:?}\n{:?}",
                                 remote_path, err
                             ),
