@@ -52,33 +52,38 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     sftp_mkdir_recur(&sftp, remote_dir_path)?;
 
     // Set up sandbox directory which will contain the uploaded files.
-    // sftp.mkdir(sandbox_path.as_path(), 0o755)?;
-
     let local_dir = "./";
     let sandbox_path = remote_dir_path.join("sandbox");
     upload_dir(&sftp, Path::new(local_dir), &sandbox_path)?;
     println!("Synced local files to remote...");
 
-    // NOTE: Executing command stuff
-    let mut channel = sess.channel_session()?;
-    channel.exec(format!("cd ~/{}", remote_dir).as_str())?;
-
     let mut command_file = sftp.create(&remote_dir_path.join("command.txt"))?;
     command_file.write_all(config.command.as_bytes())?;
+    println!("Created command file...");
 
-    // TODO: Execute given command on the uploaded directory.
-    channel.exec(format!("cd ~/{}/sandbox", remote_dir).as_str())?;
-    channel.exec(&config.command)?;
+    let mut channel = sess.channel_session()?;
+
+    let mut prefix = String::new();
+    prefix.push_str(&format!("cd {}/sandbox && ", remote_dir));
+    let command = format!("{}{}", prefix, config.command);
+    channel.exec(&command)?;
+
+    println!("Executed command...");
+
+    let mut output = String::new();
+    channel.read_to_string(&mut output)?;
+    println!("===== Output =====");
+    println!("{:#?}", output);
 
     // TODO: Read output into a buffer and print to this local machine's standard
     // output.
-
     // let mut output = String::new();
     // channel.read_to_string(&mut output)?;
     // println!("===== Output =====");
     // println!("{:#?}", output);
+
     //
-    // let _ = channel.wait_close();
+    channel.wait_close()?;
 
     // TODO: Add a clean-up part which deletes the sandbox files, otherwise
     // this will eventually cap out and/or clutter the storage allocation.
