@@ -4,9 +4,10 @@ use ssh2::{Session, Sftp};
 use std::{
     error::Error,
     fs::File,
-    io::{Read, Write},
+    io::{self, Read, Write},
     net::TcpStream,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 #[derive(Debug, Deserialize)]
@@ -69,20 +70,45 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     channel.exec(&command)?;
 
     println!("Executed command...");
+    sess.set_blocking(false);
 
-    let mut output = String::new();
-    channel.read_to_string(&mut output)?;
     println!("===== Output =====");
-    println!("{:#?}", output);
 
-    // TODO: Read output into a buffer and print to this local machine's standard
-    // output.
-    // let mut output = String::new();
-    // channel.read_to_string(&mut output)?;
-    // println!("===== Output =====");
-    // println!("{:#?}", output);
+    let mut buffer = [0; 4096];
+    loop {
+        if channel.eof() {
+            break;
+        }
 
-    //
+        let mut is_data_available = false;
+
+        // trying to read standard output
+        match channel.read(&mut buffer) {
+            Ok(size) if size > 0 => {
+                print!("{}", String::from_utf8_lossy(&buffer[..size]));
+                is_data_available = true;
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => return Err(e.into()),
+        }
+
+        // trying to read standard errors
+        match channel.stderr().read(&mut buffer) {
+            Ok(size) if size > 0 => {
+                eprint!("{}", String::from_utf8_lossy(&buffer[..size]));
+                is_data_available = true;
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => return Err(e.into()),
+        }
+
+        if !is_data_available {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+
     channel.wait_close()?;
 
     // TODO: Add a clean-up part which deletes the sandbox files, otherwise
@@ -164,6 +190,6 @@ pub fn upload_dir(
     Ok(())
 }
 
-fn clean_up() -> Result<(), Box<dyn Error>> {
-    todo!()
-}
+// fn clean_up() -> Result<(), Box<dyn Error>> {
+//
+// }
