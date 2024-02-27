@@ -47,6 +47,7 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     // matter as we will be cleaning it up after we've completed our command so
     // as to reduce space consumption and congestion.
     let temp_dir_name = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S").to_string();
+
     let remote_dir = format!(".csecmd_dump/temp/{}", temp_dir_name);
     let remote_dir_path = Path::new(&remote_dir);
 
@@ -109,10 +110,18 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
         }
     }
 
+    sess.set_blocking(true);
+    match clean_up(&sftp, remote_dir_path) {
+        Ok(_) => println!("Successfully cleaned up mess."),
+        Err(e) => eprintln!("Error cleaning up: {e}"),
+    }
+
     channel.wait_close()?;
 
-    // TODO: Add a clean-up part which deletes the sandbox files, otherwise
-    // this will eventually cap out and/or clutter the storage allocation.
+    match channel.exit_status()? {
+        0 => println!("Exit status: Success"),
+        _status => eprintln!("Exist status: Error {}", _status),
+    }
 
     println!("Disconnected from CSE UNSW...");
 
@@ -124,9 +133,6 @@ fn sftp_mkdir_recur(sftp: &Sftp, path: &Path) -> Result<(), Box<dyn Error>> {
     let mut curr_path = PathBuf::new();
     for component in path.components() {
         curr_path.push(component);
-
-        // TODO: Check that path is not to a file, if it is, then exit the
-        // function.
 
         if let Ok(metadata) = sftp.stat(curr_path.as_path()) {
             if metadata.is_dir() {
@@ -141,7 +147,8 @@ fn sftp_mkdir_recur(sftp: &Sftp, path: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Uploads a file located at the `local_path` to the remote server at the `remote_path`.
+/// Uploads a file located at the `local_path` to the remote server at the
+/// `remote_path`.
 fn upload_file(sftp: &Sftp, local_path: &Path, remote_path: &Path) -> Result<(), Box<dyn Error>> {
     let mut file = File::open(local_path)?;
     let mut metadata = Vec::new();
@@ -190,6 +197,26 @@ pub fn upload_dir(
     Ok(())
 }
 
-// fn clean_up() -> Result<(), Box<dyn Error>> {
-//
-// }
+/// Recursively clean up the temporary files which was uploaded to the remote
+/// server in order to execute the command.
+fn clean_up(sftp: &Sftp, remote_path: &Path) -> Result<(), Box<dyn Error>> {
+    let files = sftp.readdir(remote_path)?;
+
+    for (file, stats) in files {
+        if stats.is_dir() {
+            clean_up(sftp, file.as_path())?;
+        } else {
+            sftp.unlink(file.as_path())?;
+        }
+    }
+
+    // delete the parent directory if it is empty and not locked by nfs
+    if sftp.readdir(remote_path)?.is_empty() {
+        sftp.rmdir(remote_path)?;
+    } else {
+        // BUG: .nfs file blocking deletion of parent directory
+        // eprintln!("Error: could not delete directory at {:?}", remote_path);
+    }
+
+    Ok(())
+}
