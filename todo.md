@@ -10,8 +10,9 @@
 - [x] SFTP - upload required files for `6991 autotest` and `6991 give-crate` to work.
   - [x] SFTP mkdir function
   - [x] SFTP recursively upload files and/or directories.
-- [] Change directory to container directory w/ files and execute command.
-- [] Receive output and display onto local machine.
+- [x] Change directory to container directory w/ files and execute command.
+- [x] Receive output and display onto local machine.
+- [] Create script for installation on other machines
 
 # Higher Level Architecture
 
