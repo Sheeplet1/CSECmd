@@ -1,4 +1,4 @@
-use console::style;
+use console::{style, Emoji};
 use ignore::Walk;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Deserialize;
@@ -11,6 +11,16 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
+
+static TRUCK: Emoji<'_, '_> = Emoji("🚚", "");
+static HANDSHAKE: Emoji<'_, '_> = Emoji("🤝", "");
+static NETWORK: Emoji<'_, '_> = Emoji("🌐", "");
+static LOCK: Emoji<'_, '_> = Emoji("🔒", "");
+static COG: Emoji<'_, '_> = Emoji("⚙️", "");
+static BROOM: Emoji<'_, '_> = Emoji("🧹", "");
+static FOLDER: Emoji<'_, '_> = Emoji("📁", "");
+static FILE: Emoji<'_, '_> = Emoji("📄", "");
+static SPACESHIP: Emoji<'_, '_> = Emoji("🚀", "");
 
 #[derive(Debug, Deserialize)]
 pub enum Auth {
@@ -30,20 +40,29 @@ pub struct Config {
 /// the given command. Returns the standard output from the command.
 pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     let tcp = TcpStream::connect(config.server_addr)?;
-    println!("{} Connecting to CSE UNSW", style("[1/7]").bold().dim());
+    println!(
+        "{} {} Connecting to CSE UNSW",
+        style("[1/7]").bold().dim(),
+        NETWORK
+    );
 
     let mut sess = Session::new()?;
     sess.set_tcp_stream(tcp);
     sess.handshake()?;
-    println!("{} Handshake successful!", style("[2/7]").bold().dim());
+    println!(
+        "{} {} Handshake successful!",
+        style("[2/7]").bold().dim(),
+        HANDSHAKE
+    );
 
     match config.auth {
         Auth::Password(p) => sess.userauth_password(config.username.as_str(), p.as_str())?,
     };
 
     println!(
-        "{} Authentication as {}",
+        "{} {} Authentication as {}",
         style("[3/7]").bold().dim(),
+        LOCK,
         style(config.username).bold().yellow()
     );
 
@@ -64,8 +83,9 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     let sandbox_path = remote_dir_path.join("sandbox");
     upload_dir(&sftp, Path::new(local_dir), &sandbox_path)?;
     println!(
-        "{} Synced local files to remote",
-        style("[4/7]").bold().dim()
+        "{} {} Synced local files to remote",
+        style("[4/7]").bold().dim(),
+        TRUCK,
     );
 
     let mut command_file = sftp.create(&remote_dir_path.join("command.txt"))?;
@@ -78,7 +98,7 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     let command = format!("{}{}", prefix, config.command);
     channel.exec(&command)?;
 
-    println!("{} Executed command", style("[5/7]").bold().dim());
+    println!("{} {} Executed command", style("[5/7]").bold().dim(), COG);
     sess.set_blocking(false);
 
     println!(
@@ -127,8 +147,9 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     sess.set_blocking(true);
     match clean_up(&sftp, remote_dir_path) {
         Ok(_) => println!(
-            "{} Successful clean up on aisle 5",
-            style("[6/7]").bold().dim()
+            "{} {} Successful clean up on aisle 5",
+            style("[6/7]").bold().dim(),
+            BROOM
         ),
         Err(e) => eprintln!("Error cleaning up: {e}"),
     }
@@ -136,8 +157,12 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     channel.wait_close()?;
 
     match channel.exit_status()? {
-        0 => println!("{} Successfully left CSE", style("[7/7]").bold().dim()),
-        _status => eprintln!("Exist status: Error {}", _status),
+        0 => println!(
+            "{} {} Successfully left CSE",
+            style("[7/7]").bold().dim(),
+            SPACESHIP
+        ),
+        _status => eprintln!("Exit status: Error {}", _status),
     }
 
     Ok(())
@@ -203,7 +228,8 @@ pub fn upload_dir(
                     if path.is_dir() {
                         match sftp.mkdir(&remote_path, 0o755) {
                             Ok(_) => pb.set_message(
-                                format!("Created remote directory: {:?}", remote_path).to_string(),
+                                format!("{} Created remote directory: {:?}", FOLDER, remote_path)
+                                    .to_string(),
                             ),
                             Err(err) => eprintln!(
                                 "Directory creation error at {:?}\n{:?}",
@@ -212,7 +238,9 @@ pub fn upload_dir(
                         }
                     } else {
                         upload_file(sftp, path, &remote_path)?;
-                        pb.set_message(format!("Uploaded file: {:?}", remote_path).to_string());
+                        pb.set_message(
+                            format!("{} Uploaded file: {:?}", FILE, remote_path).to_string(),
+                        );
                     }
                 }
             }
