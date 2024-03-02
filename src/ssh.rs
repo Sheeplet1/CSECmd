@@ -1,4 +1,6 @@
+use console::style;
 use ignore::Walk;
+use indicatif::{ProgressBar, ProgressStyle};
 use serde::Deserialize;
 use ssh2::{Session, Sftp};
 use std::{
@@ -28,18 +30,22 @@ pub struct Config {
 /// the given command. Returns the standard output from the command.
 pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     let tcp = TcpStream::connect(config.server_addr)?;
-    println!("Connecting to CSE UNSW...");
+    println!("{} Connecting to CSE UNSW", style("[1/7]").bold().dim());
 
     let mut sess = Session::new()?;
     sess.set_tcp_stream(tcp);
     sess.handshake()?;
-    println!("Handshake successful!");
+    println!("{} Handshake successful!", style("[2/7]").bold().dim());
 
     match config.auth {
         Auth::Password(p) => sess.userauth_password(config.username.as_str(), p.as_str())?,
     };
 
-    println!("Authentication as {}", config.username);
+    println!(
+        "{} Authentication as {}",
+        style("[3/7]").bold().dim(),
+        style(config.username).bold().yellow()
+    );
 
     let sftp = sess.sftp()?;
 
@@ -57,11 +63,13 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     let local_dir = "./";
     let sandbox_path = remote_dir_path.join("sandbox");
     upload_dir(&sftp, Path::new(local_dir), &sandbox_path)?;
-    println!("Synced local files to remote...");
+    println!(
+        "{} Synced local files to remote",
+        style("[4/7]").bold().dim()
+    );
 
     let mut command_file = sftp.create(&remote_dir_path.join("command.txt"))?;
     command_file.write_all(config.command.as_bytes())?;
-    println!("Created command file...");
 
     let mut channel = sess.channel_session()?;
 
@@ -70,10 +78,15 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     let command = format!("{}{}", prefix, config.command);
     channel.exec(&command)?;
 
-    println!("Executed command...");
+    println!("{} Executed command", style("[5/7]").bold().dim());
     sess.set_blocking(false);
 
-    println!("===== Output =====");
+    println!(
+        "{} {} {}",
+        style("==========").bold().magenta(),
+        style("Output").bold().italic().magenta(),
+        style("==========").bold().magenta()
+    );
 
     let mut buffer = [0; 4096];
     loop {
@@ -110,20 +123,22 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
         }
     }
 
+    println!("{}", style("============================").bold().magenta());
     sess.set_blocking(true);
     match clean_up(&sftp, remote_dir_path) {
-        Ok(_) => println!("Successfully cleaned up mess."),
+        Ok(_) => println!(
+            "{} Successful clean up on aisle 5",
+            style("[6/7]").bold().dim()
+        ),
         Err(e) => eprintln!("Error cleaning up: {e}"),
     }
 
     channel.wait_close()?;
 
     match channel.exit_status()? {
-        0 => println!("Exit status: Success"),
+        0 => println!("{} Successfully left CSE", style("[7/7]").bold().dim()),
         _status => eprintln!("Exist status: Error {}", _status),
     }
-
-    println!("Disconnected from CSE UNSW...");
 
     Ok(())
 }
@@ -169,6 +184,14 @@ pub fn upload_dir(
 ) -> Result<(), Box<dyn Error>> {
     // TODO: Add styling here - spinner/progress bar for user
 
+    let spinner_style = ProgressStyle::default_spinner()
+        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
+        .template("{prefix:.bold.dim} {spinner} {wide_msg}")?;
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(spinner_style);
+    pb.set_prefix("Syncing files...");
+    pb.enable_steady_tick(Duration::from_millis(100));
+
     for res in Walk::new("./") {
         match res {
             Ok(entry) => {
@@ -179,7 +202,9 @@ pub fn upload_dir(
                     // If path is a directory, attempt to create the directory.
                     if path.is_dir() {
                         match sftp.mkdir(&remote_path, 0o755) {
-                            Ok(_) => (),
+                            Ok(_) => pb.set_message(
+                                format!("Created remote directory: {:?}", remote_path).to_string(),
+                            ),
                             Err(err) => eprintln!(
                                 "Directory creation error at {:?}\n{:?}",
                                 remote_path, err
@@ -187,6 +212,7 @@ pub fn upload_dir(
                         }
                     } else {
                         upload_file(sftp, path, &remote_path)?;
+                        pb.set_message(format!("Uploaded file: {:?}", remote_path).to_string());
                     }
                 }
             }
