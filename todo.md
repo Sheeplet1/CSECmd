@@ -5,3 +5,4 @@
 [] ssh-key authentication
 [] ssh agent authentication
 [] config argument - get path to config or specify path to config
+[] Fix unable to delete parent directory during cleanup.

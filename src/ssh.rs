@@ -69,8 +69,7 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
     let sftp = sess.sftp()?;
 
     // using current time-stamp as file name - realistically, this name doesn't
-    // matter as we will be cleaning it up after we've completed our command so
-    // as to reduce space consumption and congestion.
+    // matter as we will be cleaning it up after we've completed our command.
     let temp_dir_name = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S").to_string();
 
     let remote_dir = format!(".csecmd_dump/temp/{}", temp_dir_name);
@@ -88,15 +87,15 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
         TRUCK,
     );
 
-    let mut command_file = sftp.create(&remote_dir_path.join("command.txt"))?;
-    command_file.write_all(config.command.as_bytes())?;
+    let mut cmd_file = sftp.create(&remote_dir_path.join("command.txt"))?;
+    cmd_file.write_all(config.command.as_bytes())?;
 
     let mut channel = sess.channel_session()?;
 
     let mut prefix = String::new();
     prefix.push_str(&format!("cd {}/sandbox && ", remote_dir));
-    let command = format!("{}{}", prefix, config.command);
-    channel.exec(&command)?;
+    let cmd_to_execute = format!("{}{}", prefix, config.command);
+    channel.exec(&cmd_to_execute)?;
 
     println!("{} {} Executed command", style("[5/7]").bold().dim(), COG);
     sess.set_blocking(false);
@@ -138,6 +137,7 @@ pub fn connect_and_exec(config: Config) -> Result<(), Box<dyn Error>> {
             Err(e) => return Err(e.into()),
         }
 
+        // reduce cpu load
         if !is_data_available {
             std::thread::sleep(Duration::from_millis(100));
         }
@@ -201,14 +201,13 @@ fn upload_file(sftp: &Sftp, local_path: &Path, remote_path: &Path) -> Result<(),
     Ok(())
 }
 
-/// Upload the current directory to the remote server.
+/// Upload the current directory to the remote server. This will also recursively
+/// create directories at the remote location if they are missing.
 pub fn upload_dir(
     sftp: &Sftp,
     local_path: &Path,
     remote_base_path: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    // TODO: Add styling here - spinner/progress bar for user
-
     let spinner_style = ProgressStyle::default_spinner()
         .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
         .template("{prefix:.bold.dim} {spinner} {wide_msg}")?;
@@ -269,6 +268,7 @@ fn clean_up(sftp: &Sftp, remote_path: &Path) -> Result<(), Box<dyn Error>> {
         sftp.rmdir(remote_path)?;
     } else {
         // BUG: .nfs file blocking deletion of parent directory
+
         // eprintln!("Error: could not delete directory at {:?}", remote_path);
     }
 
